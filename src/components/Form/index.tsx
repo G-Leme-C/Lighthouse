@@ -15,6 +15,7 @@ import {
   Select,
   HStack,
   SimpleGrid,
+  useToast
 } from '@chakra-ui/react';
 
 import { RiPhoneFill } from 'react-icons/ri';
@@ -44,11 +45,56 @@ type handlePostFormProps = {
 };
 
 export function Form() {
-  const { register, handleSubmit, formState } = useForm<handlePostFormProps>();
+  const toast = useToast();
+
+  const regExEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  const { register, handleSubmit, formState, trigger } = useForm<handlePostFormProps>();
 
   const [isNextFormOpen, setIsNextFormOpen] = useState(false);
 
+  const createErrorToast = (errorMessage) => {
+    toast({
+      title: 'Erro',
+      description: errorMessage,
+      status: 'error',
+      duration: 5000,
+      isClosable: true
+    })
+  }
+
+  const validateForm = async (values) => {
+    if(!values.userReporter.name || values.userReporter.name.length === 0) {
+      createErrorToast('Preencha o nome.');
+      setIsNextFormOpen(false)
+      return false;
+    }
+
+    if(!values.userReporter.email || values.userReporter.email.length === 0) {
+      createErrorToast('O e-mail é obrigatório.');
+      setIsNextFormOpen(false);
+      return false;
+    }
+
+    if(values.userReporter.email.length > 0) {
+      if(regExEmail.test(values.userReporter.email) === false) {
+        createErrorToast('O e-mail preenchido é inválido.');
+        setIsNextFormOpen(false);
+        return false;
+      }
+    }
+
+    if(!values.location.address || values.location.address === 0) {
+      createErrorToast('Preencha o endereço (mesmo que seja um endereço aproximado).');
+      setIsNextFormOpen(true);
+      return false;
+    }
+
+    return true;
+  }
+
   const handlePostForm: SubmitHandler<handlePostFormProps> = async (values) => {
+    
     values.isThereChildren = Number(values.isThereChildren);
     values.isThereWomen = Number(values.isThereWomen);
     values.isThereThermalProtectionFromCold = Number(
@@ -57,14 +103,22 @@ export function Form() {
     values.urgencyLevel = Number(values.urgencyLevel);
     values.numberOfPeople = Number(values.numberOfPeople);
     values.isThereVisibleShelter = Number(values.isThereVisibleShelter);
+
+    
     console.log(values);
+
+    if(!validateForm(values)) return;
+
     api
       .post('', values)
       .then((response) => {
         console.log(response.data);
       })
       .catch((error) => {
-        console.log(error.daya);
+        console.log(error.response);
+        if(error.response.data.message) {
+          createErrorToast(error.response.data.message);
+        }
       });
   };
 
@@ -90,7 +144,7 @@ export function Form() {
                 placeholder="Digite seu nome"
                 borderColor="gray.900"
                 _hover={{ textDecoration: 'none' }}
-                {...register('userReporter.name')}
+                {...register('userReporter.name', { required: true })}
               />
             </FormControl>
             <FormControl>
@@ -99,7 +153,7 @@ export function Form() {
                 placeholder="Digite seu email"
                 borderColor="gray.900"
                 _hover={{ textDecoration: 'none' }}
-                {...register('userReporter.email')}
+                {...register('userReporter.email', { required: true, pattern: regExEmail })}
               />
             </FormControl>
             <FormControl>
@@ -170,7 +224,9 @@ export function Form() {
 
           <Flex justify="center">
             <Button
-              onClick={() => setIsNextFormOpen(true)}
+              onClick={async () => {
+                setIsNextFormOpen(true);
+              }}
               my="8"
               bg="red.600"
               color="white"
